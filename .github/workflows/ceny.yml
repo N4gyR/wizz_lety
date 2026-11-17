@@ -4,7 +4,7 @@ name: Ceny Wizz
 on:
   schedule:
     # GitHub pocita cas v UTC. 6,10,14,18 UTC = 7:17, 11:17, 15:17, 19:17 v SR (zimny cas, plati do 28.3.2027)
-    - cron: "17 6,10,14,18 * * *"
+    - cron: "17 1,7,14,19,22 * * *"
   workflow_dispatch:          # tlacidlo "Run workflow" na rucne spustenie
 
 permissions:
