@@ -4,7 +4,7 @@ name: Ceny Wizz
 on:
   schedule:
     # GitHub pocita cas v UTC. 6,10,14,18 UTC = 7:17, 11:17, 15:17, 19:17 v SR (zimny cas, plati do 28.3.2027)
-    - cron: "17 1,7,14,19,22 * * *"
+    - cron: "17 6,10,14,18 * * *"
   workflow_dispatch:          # tlacidlo "Run workflow" na rucne spustenie
 
 permissions:
@@ -30,13 +30,10 @@ jobs:
       - name: Zber cien
         run: python sleduj_ceny.py || true     # aj pri chybe ulozime riadok s CHYBA
 
-      - name: Report
-        run: python vyhodnot_ceny.py --neotvarat
-
       - name: Ulozenie do repozitara
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add ceny_wizz.txt report_ceny.html
+          git add ceny_wizz.txt
           git diff --cached --quiet || git commit -m "Zber cien $(date '+%Y-%m-%d %H:%M')"
           git push
