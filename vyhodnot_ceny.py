@@ -192,7 +192,8 @@ def pekne_hodnoty(lo, hi, n=5):
 
 def graf_ciary(serie, sirka=760, vyska=280):
     """serie: [{nazov, farba (CSS premenna), body: [(datetime, hodnota_eur, popis)]}]"""
-    L, R, T, B = 64, 120, 14, 30
+    uzky = sirka < 500
+    L, R, T, B = (48, 78, 14, 30) if uzky else (64, 120, 14, 30)
     body = [b for s in serie for b in s["body"]]
     if not body:
         return '<p class="malo">Zatiaľ žiadne dáta.</p>'
@@ -217,7 +218,7 @@ def graf_ciary(serie, sirka=760, vyska=280):
     d_od = datetime.fromtimestamp(x0).date()
     d_do = datetime.fromtimestamp(x1).date()
     pocet = (d_do - d_od).days + 1
-    krok = max(1, math.ceil(pocet / 7))                    # os X: max ~7 popisov
+    krok = max(1, math.ceil(pocet / max(2, int(W / 64))))  # os X: popisy aspon 64 px od seba
     d = d_od
     while d <= d_do:
         c = datetime.combine(d, datetime.min.time()) + timedelta(hours=12)
@@ -256,7 +257,8 @@ def graf_ciary(serie, sirka=760, vyska=280):
 
 def graf_stlpce(kategorie, sirka=760, vyska=240):
     """kategorie: [(popis, odchylka_% alebo None, pocet)] - zaporne = lacnejsie."""
-    L, R, T, B = 56, 12, 26, 44
+    uzky = sirka < 500
+    L, R, T, B = (44, 4, 26, 44) if uzky else (56, 12, 26, 44)
     hodn = [k[1] for k in kategorie if k[1] is not None]
     if not hodn:
         return '<p class="malo">Zatiaľ málo dát.</p>'
@@ -271,7 +273,11 @@ def graf_stlpce(kategorie, sirka=760, vyska=240):
     o = [f'<svg viewBox="0 0 {sirka} {vyska}" role="img" class="graf">']
     for v in tick:
         o.append(f'<line x1="{L}" x2="{L + W}" y1="{Y(v):.1f}" y2="{Y(v):.1f}" class="mriezka"/>')
-        o.append(f'<text x="{L - 8}" y="{Y(v) + 4:.1f}" class="os" text-anchor="end">{e(f_pct(v) if v else "0 %")}</text>')
+        if uzky:   # kratke popisy osi, aby sa zmestili
+            txt = ("+" if v > 0 else "") + _cislo(v, 0 if float(v).is_integer() else 1) + "%"
+        else:
+            txt = f_pct(v) if v else "0 %"
+        o.append(f'<text x="{L - 6}" y="{Y(v) + 4:.1f}" class="os" text-anchor="end">{e(txt)}</text>')
     pas = W / len(kategorie)
     sir = min(24, pas * 0.6)
     y_nula = Y(0)
@@ -302,12 +308,22 @@ def graf_stlpce(kategorie, sirka=760, vyska=240):
         o.append(f'<g class="bod"><title>{e(popis)}: {e(f_pct(v))} oproti priemeru · {n} pozorovaní</title>'
                  f'<rect x="{cx - pas / 2:.1f}" y="{T}" width="{pas:.1f}" height="{H}" fill="transparent"/>'
                  f'<path d="{d}" fill="var({farba})"/></g>'
-                 f'<text x="{cx:.1f}" y="{ty:.1f}" class="{trieda}" text-anchor="middle">{e(f_pct(v))}</text>')
+                 f'<text x="{cx:.1f}" y="{ty:.1f}" class="{trieda}" text-anchor="middle">'
+                 f'{e(f_pct(v).replace(" %", "%") if uzky else f_pct(v))}</text>')
     o.append(f'<line x1="{L}" x2="{L + W}" y1="{y_nula:.1f}" y2="{y_nula:.1f}" class="zaklad"/>')
     o.append("</svg>")
     leg = ('<div class="legenda"><span class="leg"><i style="background:var(--lacnejsie)"></i>lacnejšie než priemer</span>'
            '<span class="leg"><i style="background:var(--drahsie)"></i>drahšie než priemer</span></div>')
     return leg + "".join(o)
+
+
+def dvojica(pocitac, mobil):
+    """Ten isty graf v dvoch velkostiach - CSS ukaze ten spravny podla sirky obrazovky."""
+    return f'<div class="d-only">{pocitac}</div><div class="m-only">{mobil}</div>'
+
+
+def bunka_let(d, odlet):
+    return f'<span class="nw">{e(f_den(d))}</span> <span class="cas">{e(odlet)}</span>'
 
 
 def sparkline(zs, sirka=120, vyska=28):
@@ -371,6 +387,24 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 tr.plan td{font-weight:600}
 .znacka{display:inline-block;font-size:11px;font-weight:600;border:1px solid var(--axis);border-radius:4px;padding:0 5px;margin-left:6px;color:var(--ink2)}
 .spark{display:block}
+.m-only{display:none}
+.tab{overflow-x:auto}
+.nw{white-space:nowrap}
+.cas{color:var(--ink2)}
+@media (max-width:600px){
+ .d-only{display:none}.m-only{display:block}
+ .viz-root{padding:18px 10px 40px}
+ .karta{padding:14px;border-radius:10px}
+ h1{font-size:21px}h2{font-size:16px}
+ .dlazdice{gap:8px}
+ .dlazdica{flex:1 1 28%;padding:10px}
+ .dlazdica .v{font-size:20px}
+ .dlazdica .l,.dlazdica .d{font-size:12px}
+ table{font-size:13px}
+ th,td{padding:5px 4px}
+ .skryt-m{display:none}
+ .cas{display:block;font-size:12px}
+}
 """
 
 
@@ -409,13 +443,14 @@ def vytvor_report(a):
                 serie.append({"nazov": "Tam" if trasa == TAM else "Späť", "farba": farba, "body": body})
         o.append('<section class="karta"><h2>Vývoj ceny tvojho plánu</h2>'
                  '<p class="vysvetl">Každý bod je jeden zber. Forintová cena letu tam je prepočítaná na eurá, '
-                 'presnú cenu v Ft ukáže bod po prejdení myšou.</p>' + graf_ciary(serie) + "</section>")
+                 'presné ceny vo forintoch sú v tabuľke nižšie.</p>' + dvojica(graf_ciary(serie), graf_ciary(serie, 340, 240)) + "</section>")
     else:
         o.append('<section class="karta"><h2>Tvoj plán</h2><p class="malo">V poslednom zbere nie je označený '
                  'žiadny let plánu (stĺpec moj_plan).</p></section>')
 
     # ---- den v tyzdni
     kat = [(DNI_DLHE[i], *(a["den"][i] if i in a["den"] else (None, 0))) for i in range(7)]
+    kat_m = [(DNI[i], v, n) for i, (_, v, n) in enumerate(kat)]
     if not a["den"]:
         pozn = "Zatiaľ málo dát: treba zbery aspoň v dvoch rôznych dňoch toho istého týždňa."
     elif a["den_skup"] < 3:
@@ -427,7 +462,7 @@ def vytvor_report(a):
              '<p class="vysvetl">Cena každého letu oproti jeho priemeru v tom istom týždni. '
              'Záporné číslo znamená, že v ten deň bolo v priemere lacnejšie.</p>'
              + (f'<p class="malo">{e(pozn)}</p>' if pozn else "")
-             + (graf_stlpce(kat) if a["den"] else "") + "</section>")
+             + (dvojica(graf_stlpce(kat), graf_stlpce(kat_m, 340, 230)) if a["den"] else "") + "</section>")
     if a["den"]:
         k, (v, n) = min(a["den"].items(), key=lambda x: x[1][0])
         zaver.append(f"Deň v týždni: najlacnejšie v priemere {DNI_DLHE[k]} ({f_pct(v)}, {n} pozorovaní)"
@@ -435,6 +470,7 @@ def vytvor_report(a):
 
     # ---- hodina
     kat = [(f"{h:02d}:00", *a["hod"][h]) for h in sorted(a["hod"])]
+    kat_m = [(f"{h}h", *a["hod"][h]) for h in sorted(a["hod"])]
     if len(a["hodiny_zberu"]) < 2:
         pozn = ("Zatiaľ málo dát: zbery bežia len o " + ", ".join(f"{h:02d}:00" for h in a["hodiny_zberu"])
                 + ". Na porovnanie hodín treba spúšťať skript vo viacerých časoch dňa.")
@@ -449,7 +485,7 @@ def vytvor_report(a):
              '<p class="vysvetl">Cena každého letu oproti jeho priemeru v ten istý deň. '
              'Záporné číslo znamená, že v tú hodinu bolo v priemere lacnejšie.</p>'
              + (f'<p class="malo">{e(pozn)}</p>' if pozn else "")
-             + (graf_stlpce(kat) if kat else "") + "</section>")
+             + (dvojica(graf_stlpce(kat), graf_stlpce(kat_m, 340, 230)) if kat else "") + "</section>")
     if a["hod"]:
         k, (v, n) = min(a["hod"].items(), key=lambda x: x[1][0])
         zaver.append(f"Hodina: najlacnejšie v priemere okolo {k:02d}:00 ({f_pct(v)}, {n} pozorovaní)"
@@ -462,16 +498,16 @@ def vytvor_report(a):
                      f"({f_noci(noci)}) za ~{f_eur(spolu)}.")
         riadky = "".join(
             f'<tr class="{"plan" if (TAM, t["datum"]) in a["plan"] and (SPAT, s["datum"]) in a["plan"] else ""}">'
-            f'<td>{e(f_den(t["datum"]))} {e(t["odlet"])}</td><td>{e(f_den(s["datum"]))} {e(s["odlet"])}</td>'
-            f'<td class="n">{noci}</td><td class="n">{e(f_cena(t["cena"], t["mena"]))}</td>'
-            f'<td class="n">{e(f_cena(s["cena"], s["mena"]))}</td><td class="n">~{e(f_eur(spolu))}'
+            f'<td>{bunka_let(t["datum"], t["odlet"])}</td><td>{bunka_let(s["datum"], s["odlet"])}</td>'
+            f'<td class="n">{noci}</td><td class="n skryt-m">{e(f_cena(t["cena"], t["mena"]))}</td>'
+            f'<td class="n skryt-m">{e(f_cena(s["cena"], s["mena"]))}</td><td class="n">~{e(f_eur(spolu))}'
             f'{"<span class=znacka>PLÁN</span>" if (TAM, t["datum"]) in a["plan"] and (SPAT, s["datum"]) in a["plan"] else ""}</td></tr>'
             for t, s, noci, spolu in a["komb"][:12])
         o.append(f'<section class="karta"><h2>Najlacnejšie kombinácie teraz</h2>'
                  f'<p class="vysvetl">Podľa posledného zberu ({e(f_cas(posl))}), {MIN_NOCI} až {MAX_NOCI} nocí. '
-                 f'Návrat prilieta do Budapešti po polnoci.</p><table><thead><tr><th>Tam</th><th>Späť</th>'
-                 f'<th class="n">Nocí</th><th class="n">Cena tam</th><th class="n">Cena späť</th>'
-                 f'<th class="n">Spolu</th></tr></thead><tbody>{riadky}</tbody></table></section>')
+                 f'Návrat prilieta do Budapešti po polnoci.</p><div class="tab"><table><thead><tr><th>Tam</th><th>Späť</th>'
+                 f'<th class="n">Nocí</th><th class="n skryt-m">Cena tam</th><th class="n skryt-m">Cena späť</th>'
+                 f'<th class="n">Spolu</th></tr></thead><tbody>{riadky}</tbody></table></div></section>')
 
     # ---- vsetky lety
     for trasa in (TAM, SPAT):
@@ -485,16 +521,16 @@ def vytvor_report(a):
             stara = "" if posledna["cas"] == posl else " (už nie je v ponuke)"
             jeplan = (tr, d) in a["plan"]
             riadky.append(
-                f'<tr class="{"plan" if jeplan else ""}"><td>{e(f_den(d))} {e(posledna["odlet"])}'
+                f'<tr class="{"plan" if jeplan else ""}"><td>{bunka_let(d, posledna["odlet"])}'
                 f'{"<span class=znacka>PLÁN</span>" if jeplan else ""}{e(stara)}</td>'
                 f'<td class="n">{e(f_cena(posledna["cena"], posledna["mena"]))}</td>'
                 f'<td class="n">{e(f_cena(zmin["cena"], zmin["mena"]))}<br><span class="os">{e(f_cas(zmin["cas"]))}</span></td>'
-                f'<td class="n">{e(f_cena(zmax["cena"], zmax["mena"]))}</td>'
+                f'<td class="n skryt-m">{e(f_cena(zmax["cena"], zmax["mena"]))}</td>'
                 f'<td>{sparkline(zs)}</td></tr>')
         if riadky:
             o.append(f'<section class="karta"><h2>{e(NAZOV_TRASY.get(trasa, trasa))}</h2>'
-                     f'<table><thead><tr><th>Let</th><th class="n">Teraz</th><th class="n">Najlacnejšie (kedy)</th>'
-                     f'<th class="n">Najdrahšie</th><th>Vývoj</th></tr></thead><tbody>{"".join(riadky)}</tbody></table></section>')
+                     f'<div class="tab"><table><thead><tr><th>Let</th><th class="n">Teraz</th><th class="n">Najlacnejšie (kedy)</th>'
+                     f'<th class="n skryt-m">Najdrahšie</th><th>Vývoj</th></tr></thead><tbody>{"".join(riadky)}</tbody></table></div></section>')
 
     zaver_html = ('<section class="karta"><h2>Zhrnutie</h2><ul class="zaver">'
                   + "".join(f"<li>{e(z)}</li>" for z in zaver) + "</ul></section>")
